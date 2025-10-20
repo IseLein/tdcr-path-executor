@@ -7,7 +7,8 @@ from typing import List
 import csc376_franky
 
 from .trajectory_loader import TrajectoryData
-from .config import DEFAULT_EXECUTION_SPEED, MAX_JOINT_VELOCITY, BASE_EXECUTION_DT
+from .config import (DEFAULT_EXECUTION_SPEED, MAX_JOINT_VELOCITY,
+                     BASE_EXECUTION_DT, CONTINUITY_THRESHOLD)
 
 
 @dataclass
@@ -61,7 +62,7 @@ def execute_trajectory(
     controller = connect_robot(robot_ip)
 
     # Check if we need to move to start position
-    current_pos = controller.get_current_joint_positions()
+    current_pos = np.array(controller.get_current_joint_positions())
     start_pos = trajectory[0].franka_qpos
     position_error = np.linalg.norm(current_pos - start_pos)
 
@@ -71,7 +72,7 @@ def execute_trajectory(
     print(f"  Position error: {position_error:.4f} rad")
 
     if position_error > 0.01:
-        print(f"\nMoving to start position...")
+        print("\nMoving to start position...")
         _move_to_start(controller, current_pos, start_pos, config)
         print("✓ Reached start position")
 
@@ -105,7 +106,7 @@ def execute_trajectory(
 def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, config: ExecutionConfig) -> None:
     """Move robot from current position to trajectory start position.
 
-    Generates a simple linear interpolation trajectory.
+    Generates a linear interpolation trajectory that respects joint difference constraints.
 
     Args:
         controller: FrankaJointTrajectoryController instance
@@ -117,10 +118,9 @@ def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, c
     delta = start_pos - current_pos
     max_delta = np.max(np.abs(delta))
 
-    # Generate waypoints with conservative speed
-    # Use smaller timesteps for smoother motion
-    dt = 0.5  # 0.5 seconds between waypoints
-    num_waypoints = max(int(max_delta / (config.max_joint_velocity * dt)) + 1, 10)
+    # Ensure no two consecutive waypoints are more than CONTINUITY_THRESHOLD apart
+    num_waypoints = int(np.ceil(max_delta / CONTINUITY_THRESHOLD)) + 1
+    dt = 0.1
 
     # Linear interpolation
     move_traj = np.linspace(current_pos, start_pos, num_waypoints)

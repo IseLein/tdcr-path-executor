@@ -30,4 +30,4 @@ BASE_EXECUTION_DT = 0.1  # seconds per waypoint
 DEFAULT_EXECUTION_SPEED = 1.0
 
 MAX_JOINT_VELOCITY = 2.0  # rad/s - conservative limit for safety
-CONTINUITY_THRESHOLD = 0.5  # rad - max jump between waypoints
+CONTINUITY_THRESHOLD = 0.015  # rad - max jump between waypoints (franky limit: 0.0174 rad)
