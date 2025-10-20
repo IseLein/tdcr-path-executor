@@ -16,9 +16,9 @@ A system for visualizing and executing pre-computed motion plans on a Franka rob
 git clone <repo-url>
 cd tdcr-path-executor
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
+# Create conda environment
+conda create -n tdcr-executor python=3.12
+conda activate tdcr-executor
 
 # Install dependencies
 pip install -r requirements.txt
@@ -27,6 +27,15 @@ pip install -r requirements.txt
 cd lib/csc376_franky
 pip install .
 cd ../..
+```
+
+**If using Python venv instead:**
+```bash
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Then continue with pip install commands above
 ```
 
 ## Usage
