@@ -116,7 +116,7 @@ Examples:
     # Step 1: Load trajectory
     print(f"\n[1/4] Loading trajectory from {trajectory_path}")
     try:
-        trajectory = load_trajectory(str(trajectory_path))
+        trajectory, waypoint_multiplier = load_trajectory(str(trajectory_path))
         summary = get_trajectory_summary(trajectory)
         print(f"      Loaded {summary['num_waypoints']} waypoints")
     except Exception as e:
@@ -163,7 +163,7 @@ Examples:
     )
 
     try:
-        execute_trajectory(args.robot_ip, trajectory, exec_config)
+        execute_trajectory(args.robot_ip, trajectory, exec_config, waypoint_multiplier)
         print("\nExecution complete")
     except KeyboardInterrupt:
         print("\nExecution interrupted by user")

@@ -3,6 +3,7 @@
 import numpy as np
 from dataclasses import dataclass
 from typing import List
+from scipy.interpolate import CubicSpline
 
 import csc376_franky
 
@@ -43,7 +44,8 @@ def connect_robot(robot_ip: str):
 def execute_trajectory(
     robot_ip: str,
     trajectory: List[TrajectoryData],
-    config: ExecutionConfig = None
+    config: ExecutionConfig = None,
+    waypoint_multiplier: float = 1.0
 ):
     """Execute trajectory on real Franka robot.
 
@@ -51,6 +53,7 @@ def execute_trajectory(
         robot_ip: IP address of the Franka robot
         trajectory: List of trajectory waypoints
         config: Execution configuration (uses defaults if None)
+        waypoint_multiplier: Ratio of interpolated to original waypoints (adjusts dt)
 
     Raises:
         RuntimeError: If execution fails
@@ -73,11 +76,12 @@ def execute_trajectory(
 
     if position_error > 0.01:
         print("\nMoving to start position...")
-        _move_to_start(controller, current_pos, start_pos, config)
+        _move_to_start(controller, current_pos, start_pos, config, waypoint_multiplier)
         print("✓ Reached start position")
 
     q_traj = np.array([wp.franka_qpos for wp in trajectory])
-    dt = BASE_EXECUTION_DT / config.speed_scale if config.speed_scale > 0 else BASE_EXECUTION_DT
+    # Adjust dt by waypoint_multiplier to keep total execution time constant
+    dt = BASE_EXECUTION_DT / (config.speed_scale * waypoint_multiplier) if config.speed_scale > 0 else BASE_EXECUTION_DT / waypoint_multiplier
 
     max_velocity = _estimate_max_velocity(q_traj, dt)
     if max_velocity > config.max_joint_velocity:
@@ -90,6 +94,7 @@ def execute_trajectory(
 
     print("\nExecution info:")
     print(f"  - Waypoints: {len(trajectory)}")
+    print(f"  - Waypoint multiplier: {waypoint_multiplier:.2f}x")
     print(f"  - Speed scale: {config.speed_scale}")
     print(f"  - Timestep: {dt:.3f} seconds")
     print(f"  - Estimated duration: {len(trajectory) * dt:.1f} seconds")
@@ -103,24 +108,30 @@ def execute_trajectory(
         raise RuntimeError(f"Trajectory execution failed: {e}")
 
 
-def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, config: ExecutionConfig) -> None:
+def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, config: ExecutionConfig, waypoint_multiplier: float = 1.0) -> None:
     """Move robot from current position to trajectory start position.
 
-    Generates a linear interpolation trajectory that respects joint difference constraints.
+    Generates a smooth cubic spline trajectory that respects joint difference constraints.
 
     Args:
         controller: FrankaJointTrajectoryController instance
         current_pos: Current joint positions (7-element array)
         start_pos: Target start joint positions (7-element array)
         config: Execution configuration
+        waypoint_multiplier: Ratio to adjust dt (keeps timing consistent)
     """
     delta = start_pos - current_pos
     max_delta = np.max(np.abs(delta))
 
     num_waypoints = int(np.ceil(max_delta / CONTINUITY_THRESHOLD)) + 1
-    dt = BASE_EXECUTION_DT / config.speed_scale if config.speed_scale > 0 else BASE_EXECUTION_DT
+    dt = BASE_EXECUTION_DT / (config.speed_scale * waypoint_multiplier) if config.speed_scale > 0 else BASE_EXECUTION_DT / waypoint_multiplier
 
-    move_traj = np.linspace(current_pos, start_pos, num_waypoints)
+    waypoints = np.array([current_pos, start_pos])
+    params = np.linspace(0, 1, 2)
+    spline = CubicSpline(params, waypoints, bc_type='natural')
+
+    dense_params = np.linspace(0, 1, num_waypoints)
+    move_traj = spline(dense_params)
 
     print(f"  - Move distance: {max_delta:.4f} rad")
     print(f"  - Move waypoints: {num_waypoints}")

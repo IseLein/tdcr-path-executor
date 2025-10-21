@@ -85,7 +85,7 @@ def interpolate_trajectory(trajectory: List[TrajectoryData]) -> List[TrajectoryD
     return interpolated
 
 
-def load_trajectory(json_path: str) -> List[TrajectoryData]:
+def load_trajectory(json_path: str) -> tuple[List[TrajectoryData], float]:
     """Load trajectory from JSON file.
 
     Supports multiple JSON formats:
@@ -101,7 +101,9 @@ def load_trajectory(json_path: str) -> List[TrajectoryData]:
         json_path: Path to JSON trajectory file
 
     Returns:
-        List of TrajectoryData waypoints
+        Tuple of (trajectory waypoints, waypoint_multiplier)
+        - trajectory: List of TrajectoryData waypoints
+        - waypoint_multiplier: Ratio of interpolated to original waypoints
 
     Raises:
         FileNotFoundError: If file doesn't exist
@@ -139,12 +141,14 @@ def load_trajectory(json_path: str) -> List[TrajectoryData]:
     # Interpolate trajectory to ensure continuity
     original_count = len(trajectory)
     trajectory = interpolate_trajectory(trajectory)
+    waypoint_multiplier = len(trajectory) / original_count if original_count > 0 else 1.0
+
     if len(trajectory) > original_count:
         print(f"✓ Interpolated trajectory: {original_count} → {len(trajectory)} waypoints "
-              f"({len(trajectory) / original_count}x for continuity)")
+              f"({waypoint_multiplier:.2f}x for continuity)")
 
     validate_trajectory(trajectory)
-    return trajectory
+    return trajectory, waypoint_multiplier
 
 
 def validate_trajectory(trajectory: List[TrajectoryData]) -> None:
