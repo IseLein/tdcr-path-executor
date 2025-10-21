@@ -29,6 +29,52 @@ class TrajectoryData:
         )
 
 
+def interpolate_trajectory(trajectory: List[TrajectoryData]) -> List[TrajectoryData]:
+    """Interpolate trajectory to ensure continuity constraints are met.
+
+    Inserts additional waypoints between any pair of waypoints that exceed
+    the continuity threshold.
+
+    Args:
+        trajectory: Original trajectory waypoints
+
+    Returns:
+        Interpolated trajectory with additional waypoints if needed
+    """
+    if len(trajectory) < 2:
+        return trajectory
+
+    interpolated = [trajectory[0]]
+
+    for i in range(1, len(trajectory)):
+        prev_wp = interpolated[-1]
+        curr_wp = trajectory[i]
+
+        # Check if interpolation is needed
+        joint_delta = np.abs(curr_wp.franka_qpos - prev_wp.franka_qpos)
+        max_delta = np.max(joint_delta)
+
+        if max_delta > CONTINUITY_THRESHOLD:
+            # Calculate number of intermediate waypoints needed
+            num_segments = int(np.ceil(max_delta / CONTINUITY_THRESHOLD))
+
+            for j in range(1, num_segments):
+                alpha = j / num_segments
+                interp_qpos = prev_wp.franka_qpos + alpha * (curr_wp.franka_qpos - prev_wp.franka_qpos)
+                interp_tendons = prev_wp.tdcr_tendon_lengths + alpha * (curr_wp.tdcr_tendon_lengths - prev_wp.tdcr_tendon_lengths)
+                interp_step = prev_wp.step + int(alpha * (curr_wp.step - prev_wp.step))
+
+                interpolated.append(TrajectoryData(
+                    franka_qpos=interp_qpos,
+                    tdcr_tendon_lengths=interp_tendons,
+                    step=interp_step
+                ))
+
+        interpolated.append(curr_wp)
+
+    return interpolated
+
+
 def load_trajectory(json_path: str) -> List[TrajectoryData]:
     """Load trajectory from JSON file.
 
@@ -79,6 +125,13 @@ def load_trajectory(json_path: str) -> List[TrajectoryData]:
             tdcr_tendon_lengths=tdcr_tendon_lengths,
             step=step
         ))
+
+    # Interpolate trajectory to ensure continuity
+    original_count = len(trajectory)
+    trajectory = interpolate_trajectory(trajectory)
+    if len(trajectory) > original_count:
+        print(f"✓ Interpolated trajectory: {original_count} → {len(trajectory)} waypoints "
+              f"(added {len(trajectory) - original_count} for continuity)")
 
     validate_trajectory(trajectory)
     return trajectory
