@@ -8,15 +8,14 @@ from scipy.interpolate import CubicSpline
 import csc376_franky
 
 from .trajectory_loader import TrajectoryData
-from .config import (DEFAULT_EXECUTION_SPEED, MAX_JOINT_VELOCITY,
-                     BASE_EXECUTION_DT, CONTINUITY_THRESHOLD)
+from .config import (DEFAULT_EXECUTION_SPEED, BASE_EXECUTION_DT,
+                     CONTINUITY_THRESHOLD)
 
 
 @dataclass
 class ExecutionConfig:
     """Configuration for robot trajectory execution."""
     speed_scale: float = DEFAULT_EXECUTION_SPEED
-    max_joint_velocity: float = MAX_JOINT_VELOCITY
 
 
 def connect_robot(robot_ip: str):
@@ -80,21 +79,11 @@ def execute_trajectory(
     q_traj = np.array([wp.franka_qpos for wp in trajectory])
     dt = BASE_EXECUTION_DT / config.speed_scale if config.speed_scale > 0 else BASE_EXECUTION_DT
 
-    max_velocity = _estimate_max_velocity(q_traj, dt)
-    if max_velocity > config.max_joint_velocity:
-        print(f"\nWarning: Trajectory max velocity ({max_velocity:.3f} rad/s) "
-              f"exceeds safety limit ({config.max_joint_velocity:.3f} rad/s)")
-        response = input("Continue anyway? [yes/no]: ")
-        if response.lower() != "yes":
-            print("Execution cancelled by user")
-            return
-
     print("\nExecution info:")
-    print(f"  - Waypoints: {len(trajectory)}")
-    print(f"  - Speed scale: {config.speed_scale}")
-    print(f"  - Timestep: {dt:.3f} seconds")
-    print(f"  - Estimated duration: {len(trajectory) * dt:.1f} seconds")
-    print(f"  - Max velocity: {max_velocity:.3f} rad/s")
+    print(f"\t- Waypoints: {len(trajectory)}")
+    print(f"\t- Speed scale: {config.speed_scale}")
+    print(f"\t- Timestep: {dt:.3f} seconds")
+    print(f"\t- Estimated duration: {len(trajectory) * dt:.1f} seconds")
 
     print("\nExecuting trajectory...")
     try:
@@ -107,8 +96,6 @@ def execute_trajectory(
 def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, config: ExecutionConfig) -> None:
     """Move robot from current position to trajectory start position.
 
-    Generates a smooth cubic spline trajectory that respects joint difference constraints.
-
     Args:
         controller: FrankaJointTrajectoryController instance
         current_pos: Current joint positions (7-element array)
@@ -118,7 +105,7 @@ def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, c
     delta = start_pos - current_pos
     max_delta = np.max(np.abs(delta))
 
-    num_waypoints = int(np.ceil(max_delta / CONTINUITY_THRESHOLD)) + 1
+    num_waypoints = int(np.ceil(max_delta / CONTINUITY_THRESHOLD)) * 5
     dt = BASE_EXECUTION_DT / config.speed_scale if config.speed_scale > 0 else BASE_EXECUTION_DT
 
     waypoints = np.array([current_pos, start_pos])
@@ -133,21 +120,3 @@ def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, c
     print(f"  - Estimated time: {num_waypoints * dt:.1f} seconds")
 
     controller.run_trajectory(move_traj, dt)
-
-
-def _estimate_max_velocity(q_traj: np.ndarray, dt: float) -> float:
-    """Estimate maximum joint velocity from trajectory.
-
-    Args:
-        q_traj: Joint trajectory array (N x 7)
-        dt: Time step between waypoints in seconds
-
-    Returns:
-        Maximum joint velocity estimate in rad/s
-    """
-    if len(q_traj) < 2:
-        return 0.0
-
-    deltas = np.diff(q_traj, axis=0)
-    max_delta = np.max(np.abs(deltas))
-    return max_delta / dt

@@ -1,30 +1,19 @@
 #!/usr/bin/env python3
 """
 TDCR Path Executor - Main entry point.
-
-Workflow:
-1. Load trajectory from JSON file
-2. Visualize in MuJoCo simulation
-3. Prompt user for confirmation
-4. Execute on real robot (if confirmed)
 """
 
 import argparse
 import sys
 from pathlib import Path
 
-from src.trajectory_loader import load_trajectory, get_trajectory_summary
+from src.trajectory_loader import load_trajectory
 from src.mujoco_sim import visualize_trajectory, SimulationConfig
 from src.robot_executor import execute_trajectory, ExecutionConfig
 from src.config import DEFAULT_SCENE_PATH
 
 
 def confirm_execution() -> bool:
-    """Prompt user for confirmation after simulation.
-
-    Returns:
-        True if user confirms, False otherwise
-    """
     print("\n" + "=" * 60)
     print("Simulation complete!")
     print("=" * 60)
@@ -76,7 +65,7 @@ Examples:
         "--fps",
         type=int,
         default=10,
-        help="Simulation playback speed (waypoints per second)"
+        help="Simulation playback speed (default=10)"
     )
     parser.add_argument(
         "--no-loop",
@@ -87,13 +76,7 @@ Examples:
         "--speed-scale",
         type=float,
         default=1.0,
-        help="Playback speed multiplier for simulation"
-    )
-    parser.add_argument(
-        "--execution-speed",
-        type=float,
-        default=1.0,
-        help="Execution speed multiplier (1.0=normal, 0.5=half speed, 2.0=double speed)"
+        help="Speed multiplier"
     )
 
     args = parser.parse_args()
@@ -109,22 +92,25 @@ Examples:
         print(f"Error: Scene file not found: {scene_path}")
         sys.exit(1)
 
+    if args.speed_scale <= 0:
+        print(
+            f"Error: --speed-scale must be positive (got {args.speed_scale})"
+        )
+        sys.exit(1)
+
     print("=" * 60)
     print("TDCR Path Executor")
     print("=" * 60)
 
-    # Step 1: Load trajectory
-    print(f"\n[1/4] Loading trajectory from {trajectory_path}")
+    print(f"\nLoading trajectory from {trajectory_path}")
     try:
         trajectory = load_trajectory(str(trajectory_path))
-        summary = get_trajectory_summary(trajectory)
-        print(f"      Loaded {summary['num_waypoints']} waypoints")
+        print(f"\tLoaded {len(trajectory)} waypoints")
     except Exception as e:
         print(f"Error loading trajectory: {e}")
         sys.exit(1)
 
-    # Step 2: Visualize in MuJoCo
-    print("\n[2/4] Launching MuJoCo visualization")
+    print("\nLaunching MuJoCo visualization")
     sim_config = SimulationConfig(
         fps=args.fps,
         loop=not args.no_loop,
@@ -140,26 +126,24 @@ Examples:
         print(f"Error during visualization: {e}")
         sys.exit(1)
 
-    # Step 3: Check if execution is requested
     print("\nSimulation complete")
-    print("\n[3/4] Execution decision")
+    print("\nExecution decision")
 
     if args.simulate_only:
-        print("      --simulate-only flag set, skipping execution")
+        print("\t--simulate-only flag set, skipping execution")
         return
 
     if args.robot_ip is None:
-        print("      No --robot-ip provided, skipping execution")
+        print("\tNo --robot-ip provided, skipping execution")
         return
 
     if not confirm_execution():
-        print("      User declined execution")
+        print("\tUser declined execution")
         return
 
-    # Step 4: Execute on real robot
-    print("\n[4/4] Executing on robot")
+    print("\nExecuting on robot")
     exec_config = ExecutionConfig(
-        speed_scale=args.execution_speed
+        speed_scale=args.speed_scale
     )
 
     try:

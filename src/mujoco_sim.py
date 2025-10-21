@@ -40,13 +40,13 @@ def visualize_trajectory(
     data = mujoco.MjData(model)
 
     print("\nTrajectory info:")
-    print(f"  - Total waypoints: {len(trajectory)}")
-    print(f"  - Playback speed: {config.fps} waypoints/sec")
-    print(f"  - Speed scale: {config.speed_scale}x")
-    print(f"  - Loop: {config.loop}")
+    print(f"\t- Total waypoints: {len(trajectory)}")
+    print(f"\t- Playback speed: {config.fps} waypoints/sec")
+    print(f"\t- Speed scale: {config.speed_scale}x")
+    print(f"\t- Loop: {config.loop}")
     print("\nControls:")
-    print("  - Close window to quit")
-    print("  - Press SPACE in viewer to pause/play")
+    print("\t- Close window to quit")
+    print("\t- Press SPACE in viewer to pause/play")
 
     running = [True]
 
@@ -107,7 +107,7 @@ def _control_loop(
 
         if step_idx == 0:
             print("Waiting for system to get to start position")
-            time.sleep(1.5)
+            time.sleep(2.0)
 
         step_idx += 1
         time.sleep(1.0 / effective_fps)
