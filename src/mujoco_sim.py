@@ -104,5 +104,10 @@ def _control_loop(
             data.ctrl[7 + i] = length
 
         print(f"Waypoint {step_idx + 1}/{len(trajectory)}", end='\r')
+
+        if step_idx == 0:
+            print("Waiting for system to get to start position")
+            time.sleep(1.5)
+
         step_idx += 1
         time.sleep(1.0 / effective_fps)
