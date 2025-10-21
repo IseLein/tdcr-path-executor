@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
+from scipy.interpolate import CubicSpline
 
 import numpy as np
 
@@ -30,48 +31,57 @@ class TrajectoryData:
 
 
 def interpolate_trajectory(trajectory: List[TrajectoryData]) -> List[TrajectoryData]:
-    """Interpolate trajectory to ensure continuity constraints are met.
+    """Interpolate trajectory using cubic splines for smooth motion.
 
-    Inserts additional waypoints between any pair of waypoints that exceed
-    the continuity threshold.
+    Treats robot state as a single point in 16D configuration space
+    (7 Franka joints + 9 TDCR tendons), ensuring franka positions and
+    tendon lengths remain synchronized during interpolation. Creates
+    C2-continuous (smooth position, velocity, acceleration) trajectory.
 
     Args:
         trajectory: Original trajectory waypoints
 
     Returns:
-        Interpolated trajectory with additional waypoints if needed
+        Smoothly interpolated trajectory with additional waypoints
     """
     if len(trajectory) < 2:
         return trajectory
 
-    interpolated = [trajectory[0]]
+    combined_waypoints = np.array([
+        np.concatenate([wp.franka_qpos, wp.tdcr_tendon_lengths])
+        for wp in trajectory
+    ])
 
+    original_params = np.linspace(0, 1, len(trajectory))
+    spline_waypoints = CubicSpline(
+        original_params, combined_waypoints, bc_type='natural'
+    )
+
+    # Determine sampling density to meet continuity threshold
+    max_delta = 0.0
     for i in range(1, len(trajectory)):
-        prev_wp = interpolated[-1]
-        curr_wp = trajectory[i]
+        delta = np.max(
+            np.abs(trajectory[i].franka_qpos - trajectory[i-1].franka_qpos)
+        )
+        max_delta = max(max_delta, delta)
 
-        # Check if interpolation is needed
-        joint_delta = np.abs(curr_wp.franka_qpos - prev_wp.franka_qpos)
-        max_delta = np.max(joint_delta)
+    samples_per_segment = max(
+        1, int(np.ceil(max_delta / (0.8 * CONTINUITY_THRESHOLD)))
+    )
+    print(f"Max segment: {max_delta}")
+    print(f"Samples: {samples_per_segment}")
+    total_samples = len(trajectory) * samples_per_segment
 
-        if max_delta > CONTINUITY_THRESHOLD:
-            # Calculate number of intermediate waypoints needed
-            num_segments = int(np.ceil(max_delta / CONTINUITY_THRESHOLD))
+    dense_params = np.linspace(0, 1, total_samples)
+    dense_waypoints = spline_waypoints(dense_params)
 
-            for j in range(1, num_segments):
-                alpha = j / num_segments
-                interp_qpos = prev_wp.franka_qpos + alpha * (curr_wp.franka_qpos - prev_wp.franka_qpos)
-                interp_tendons = prev_wp.tdcr_tendon_lengths + alpha * (curr_wp.tdcr_tendon_lengths - prev_wp.tdcr_tendon_lengths)
-                interp_step = prev_wp.step + int(alpha * (curr_wp.step - prev_wp.step))
-
-                interpolated.append(TrajectoryData(
-                    franka_qpos=interp_qpos,
-                    tdcr_tendon_lengths=interp_tendons,
-                    step=interp_step
-                ))
-
-        interpolated.append(curr_wp)
-
+    interpolated = []
+    for i in range(len(dense_params)):
+        interpolated.append(TrajectoryData(
+            franka_qpos=dense_waypoints[i, :7],
+            tdcr_tendon_lengths=dense_waypoints[i, 7:],
+            step=(i + 1)
+        ))
     return interpolated
 
 
@@ -131,7 +141,7 @@ def load_trajectory(json_path: str) -> List[TrajectoryData]:
     trajectory = interpolate_trajectory(trajectory)
     if len(trajectory) > original_count:
         print(f"✓ Interpolated trajectory: {original_count} → {len(trajectory)} waypoints "
-              f"(added {len(trajectory) - original_count} for continuity)")
+              f"({len(trajectory) / original_count}x for continuity)")
 
     validate_trajectory(trajectory)
     return trajectory
