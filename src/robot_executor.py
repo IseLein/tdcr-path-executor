@@ -114,15 +114,12 @@ def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, c
         start_pos: Target start joint positions (7-element array)
         config: Execution configuration
     """
-    # Calculate required motion
     delta = start_pos - current_pos
     max_delta = np.max(np.abs(delta))
 
-    # Ensure no two consecutive waypoints are more than CONTINUITY_THRESHOLD apart
     num_waypoints = int(np.ceil(max_delta / CONTINUITY_THRESHOLD)) + 1
-    dt = 0.1
+    dt = BASE_EXECUTION_DT / config.speed_scale if config.speed_scale > 0 else BASE_EXECUTION_DT
 
-    # Linear interpolation
     move_traj = np.linspace(current_pos, start_pos, num_waypoints)
 
     print(f"  - Move distance: {max_delta:.4f} rad")
