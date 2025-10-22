@@ -1,8 +1,9 @@
 """Execute trajectories on real Franka robot using csc376_franky library."""
 
+import time
 import numpy as np
 from dataclasses import dataclass
-from typing import List
+from typing import List, Dict
 from scipy.interpolate import CubicSpline
 
 import csc376_franky
@@ -16,6 +17,23 @@ from .config import (DEFAULT_EXECUTION_SPEED, BASE_EXECUTION_DT,
 class ExecutionConfig:
     """Configuration for robot trajectory execution."""
     speed_scale: float = DEFAULT_EXECUTION_SPEED
+
+
+def group_trajectory_by_step(trajectory: List[TrajectoryData]) -> Dict[int, List[TrajectoryData]]:
+    """Group trajectory waypoints by their step number.
+
+    Args:
+        trajectory: List of trajectory waypoints
+
+    Returns:
+        Dictionary mapping step number to list of waypoints for that step
+    """
+    grouped = {}
+    for wp in trajectory:
+        if wp.step not in grouped:
+            grouped[wp.step] = []
+        grouped[wp.step].append(wp)
+    return grouped
 
 
 def connect_robot(robot_ip: str):
@@ -76,18 +94,28 @@ def execute_trajectory(
         _move_to_start(controller, current_pos, start_pos, config)
         print("✓ Reached start position")
 
-    q_traj = np.array([wp.franka_qpos for wp in trajectory])
-    dt = BASE_EXECUTION_DT / config.speed_scale if config.speed_scale > 0 else BASE_EXECUTION_DT
+    grouped_trajectory = group_trajectory_by_step(trajectory)
+    steps = sorted(grouped_trajectory.keys())
+
+    dt = BASE_EXECUTION_DT / config.speed_scale
 
     print("\nExecution info:")
-    print(f"\t- Waypoints: {len(trajectory)}")
+    print(f"\t- Given waypoints: {len(steps)}")
+    print(f"\t- Total waypoints: {len(trajectory)}")
     print(f"\t- Speed scale: {config.speed_scale}")
     print(f"\t- Timestep: {dt:.3f} seconds")
     print(f"\t- Estimated duration: {len(trajectory) * dt:.1f} seconds")
 
-    print("\nExecuting trajectory...")
+    print("\nExecuting trajectory step-by-step...")
     try:
-        controller.run_trajectory(q_traj, dt)
+        for i, step in enumerate(steps):
+            step_waypoints = grouped_trajectory[step]
+            q_step = np.array([wp.franka_qpos for wp in step_waypoints])
+
+            print(f"Step {step} ({i+1}/{len(steps)}): {len(step_waypoints)} waypoint(s)", end='\r')
+            controller.run_trajectory(q_step, dt)
+            time.sleep(dt)
+
         print("Trajectory executed successfully")
     except Exception as e:
         raise RuntimeError(f"Trajectory execution failed: {e}")
@@ -105,15 +133,10 @@ def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, c
     delta = start_pos - current_pos
     max_delta = np.max(np.abs(delta))
 
-    num_waypoints = int(np.ceil(max_delta / CONTINUITY_THRESHOLD)) * 5
-    dt = BASE_EXECUTION_DT / config.speed_scale if config.speed_scale > 0 else BASE_EXECUTION_DT
+    num_waypoints = int(np.ceil(max_delta / CONTINUITY_THRESHOLD))
+    dt = BASE_EXECUTION_DT / config.speed_scale
 
-    waypoints = np.array([current_pos, start_pos])
-    params = np.linspace(0, 1, 2)
-    spline = CubicSpline(params, waypoints, bc_type='natural')
-
-    dense_params = np.linspace(0, 1, num_waypoints)
-    move_traj = spline(dense_params)
+    move_traj = np.linspace(current_pos, start_pos, num_waypoints)
 
     print(f"  - Move distance: {max_delta:.4f} rad")
     print(f"  - Move waypoints: {num_waypoints}")
