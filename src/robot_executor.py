@@ -6,7 +6,14 @@ from dataclasses import dataclass
 from typing import List, Dict
 from scipy.interpolate import CubicSpline
 
-import csc376_franky
+ # Try to import csc376_franky, but allow running without it (simulation only)
+try:
+    import csc376_franky
+    ROBOT_AVAILABLE = True
+except ImportError:
+    ROBOT_AVAILABLE = False
+    print("WARNING: csc376_franky not available - robot execution disabled")
+    print("Use --simulate-only to run in simulation mode")
 
 from .trajectory_loader import TrajectoryData
 from .config import (DEFAULT_EXECUTION_SPEED, BASE_EXECUTION_DT,

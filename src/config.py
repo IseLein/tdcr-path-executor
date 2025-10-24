@@ -4,7 +4,7 @@ import os
 import numpy as np
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_SCENE_PATH = os.path.join(_PROJECT_ROOT, "data", "ftl_ftdcr_v2_franka_scene.xml")
+DEFAULT_SCENE_PATH = os.path.join(_PROJECT_ROOT, "data", "ftdcr_v2_independent_franka_scene.xml")
 
 # Franka Emika Panda joint limits (radians)
 FRANKA_JOINT_LIMITS = np.array([
@@ -19,6 +19,6 @@ FRANKA_JOINT_LIMITS = np.array([
 
 TDCR_TENDON_COUNT = 9
 DEFAULT_MUJOCO_FPS = 10
-BASE_EXECUTION_DT = 0.1  # seconds
+BASE_EXECUTION_DT = 0.01  # seconds
 DEFAULT_EXECUTION_SPEED = 1.0
 CONTINUITY_THRESHOLD = 0.015  # (franky limit: 0.0174 rad)
