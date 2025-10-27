@@ -19,23 +19,6 @@ class ExecutionConfig:
     speed_scale: float = DEFAULT_EXECUTION_SPEED
 
 
-def group_trajectory_by_step(trajectory: List[TrajectoryData]) -> Dict[int, List[TrajectoryData]]:
-    """Group trajectory waypoints by their step number.
-
-    Args:
-        trajectory: List of trajectory waypoints
-
-    Returns:
-        Dictionary mapping step number to list of waypoints for that step
-    """
-    grouped = {}
-    for wp in trajectory:
-        if wp.step not in grouped:
-            grouped[wp.step] = []
-        grouped[wp.step].append(wp)
-    return grouped
-
-
 def connect_robot(robot_ip: str):
     """Initialize connection to Franka robot.
 
@@ -94,28 +77,18 @@ def execute_trajectory(
         _move_to_start(controller, current_pos, start_pos, config)
         print("✓ Reached start position")
 
-    grouped_trajectory = group_trajectory_by_step(trajectory)
-    steps = sorted(grouped_trajectory.keys())
-
+    q_traj = np.array([wp.franka_qpos for wp in trajectory])
     dt = BASE_EXECUTION_DT / config.speed_scale
 
     print("\nExecution info:")
-    print(f"\t- Given waypoints: {len(steps)}")
-    print(f"\t- Total waypoints: {len(trajectory)}")
+    print(f"\t- Waypoints: {len(trajectory)}")
     print(f"\t- Speed scale: {config.speed_scale}")
     print(f"\t- Timestep: {dt:.3f} seconds")
     print(f"\t- Estimated duration: {len(trajectory) * dt:.1f} seconds")
 
-    print("\nExecuting trajectory step-by-step...")
+    print("\nExecuting trajectory...")
     try:
-        for i, step in enumerate(steps):
-            step_waypoints = grouped_trajectory[step]
-            q_step = np.array([wp.franka_qpos for wp in step_waypoints])
-
-            print(f"Step {step} ({i+1}/{len(steps)}): {len(step_waypoints)} waypoint(s)", end='\r')
-            controller.run_trajectory(q_step, dt)
-            time.sleep(dt)
-
+        controller.run_trajectory(q_traj, dt)
         print("Trajectory executed successfully")
     except Exception as e:
         raise RuntimeError(f"Trajectory execution failed: {e}")
