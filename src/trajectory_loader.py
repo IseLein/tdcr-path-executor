@@ -4,7 +4,6 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
-from scipy.interpolate import CubicSpline
 
 import numpy as np
 
@@ -21,6 +20,7 @@ class TrajectoryData:
     franka_qpos: np.ndarray
     tdcr_tendon_lengths: np.ndarray
     step: int
+    time: float
 
     def __post_init__(self):
         self.franka_qpos = np.asarray(self.franka_qpos, dtype=np.float64)
@@ -30,49 +30,7 @@ class TrajectoryData:
         )
 
 
-def interpolate_trajectory(trajectory: List[TrajectoryData]) -> List[TrajectoryData]:
-    """Linearly interpolate between waypoints to ensure continuity limits.
-
-    Args:
-        trajectory: Original trajectory waypoints
-
-    Returns:
-        Trajectory with linear interpolation added where needed
-    """
-    if len(trajectory) < 2:
-        return trajectory
-
-    interpolated = [trajectory[0]]
-
-    for i in range(1, len(trajectory)):
-        prev_wp = trajectory[i - 1]
-        curr_wp = trajectory[i]
-
-        joint_deltas = np.abs(curr_wp.franka_qpos - prev_wp.franka_qpos)
-        max_delta = np.max(joint_deltas)
-        if max_delta > CONTINUITY_THRESHOLD:
-            num_segments = int(np.ceil(max_delta / CONTINUITY_THRESHOLD))
-
-            for j in range(1, num_segments):
-                alpha = j / num_segments
-                interp_franka = prev_wp.franka_qpos + alpha * (curr_wp.franka_qpos - prev_wp.franka_qpos)
-
-                interpolated.append(TrajectoryData(
-                    franka_qpos=interp_franka,
-                    tdcr_tendon_lengths=curr_wp.tdcr_tendon_lengths,
-                    step=curr_wp.step
-                ))
-
-        interpolated.append(TrajectoryData(
-            franka_qpos=curr_wp.franka_qpos,
-            tdcr_tendon_lengths=curr_wp.tdcr_tendon_lengths,
-            step=curr_wp.step
-        ))
-
-    return interpolated
-
-
-def load_trajectory(json_path: str) -> List[TrajectoryData]:
+def load_trajectory(json_path: str) -> tuple[List[TrajectoryData], float]:
     """Load trajectory from JSON file.
 
     Supports multiple JSON formats:
@@ -83,16 +41,17 @@ def load_trajectory(json_path: str) -> List[TrajectoryData]:
     - "franka_qpos": list of 7 joint angles (required)
     - "tendon_lengths": list of 9 values
     - "step": integer step index (optional)
+    - "time": float timestamp in seconds (required)
 
     Args:
         json_path: Path to JSON trajectory file
 
     Returns:
-        List of TrajectoryData waypoints
+        Tuple of (trajectory waypoints, dt between steps in seconds)
 
     Raises:
         FileNotFoundError: If file doesn't exist
-        ValueError: If JSON format is invalid
+        ValueError: If JSON format is invalid or dt is not constant
     """
     json_path = Path(json_path)
     if not json_path.exists():
@@ -116,22 +75,34 @@ def load_trajectory(json_path: str) -> List[TrajectoryData]:
         franka_qpos = waypoint["franka_qpos"]
         tdcr_tendon_lengths = waypoint["tendon_lengths"]
         step = waypoint["step"]
+        time = waypoint["time"]
 
         trajectory.append(TrajectoryData(
             franka_qpos=franka_qpos,
             tdcr_tendon_lengths=tdcr_tendon_lengths,
-            step=step
+            step=step,
+            time=time
         ))
 
-    original_count = len(trajectory)
-    trajectory = interpolate_trajectory(trajectory)
-
-    if len(trajectory) > original_count:
-        print(f"✓ Interpolated trajectory: {original_count} → {len(trajectory)} waypoints "
-              f"({len(trajectory) - original_count} waypoints added for continuity)")
+    # Calculate dt from time differences
+    if len(trajectory) < 2:
+        raise ValueError("Trajectory must have at least 2 waypoints to calculate dt")
+    
+    times = np.array([wp.time for wp in trajectory])
+    dts = np.diff(times)
+    dt = np.mean(dts)
+    
+    # Verify dt is constant (within tolerance)
+    if np.std(dts) > 1e-6:
+        raise ValueError(
+            f"Time differences are not constant! "
+            f"Mean dt: {dt:.6f}s, Std: {np.std(dts):.9f}s"
+        )
+    
+    print(f"✓ Trajectory dt: {dt:.6f}s ({1.0/dt:.1f} Hz)")
 
     validate_trajectory(trajectory)
-    return trajectory
+    return trajectory, dt
 
 
 def validate_trajectory(trajectory: List[TrajectoryData]) -> None:

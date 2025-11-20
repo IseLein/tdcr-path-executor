@@ -9,7 +9,7 @@ from pathlib import Path
 
 from src.trajectory_loader import load_trajectory
 from src.mujoco_sim import visualize_trajectory, SimulationConfig
-from src.robot_executor import execute_trajectory, ExecutionConfig
+from src.robot_executor import execute_trajectory
 from src.config import DEFAULT_SCENE_PATH
 
 
@@ -72,12 +72,6 @@ Examples:
         action="store_true",
         help="Don't loop trajectory in simulation"
     )
-    parser.add_argument(
-        "--speed-scale",
-        type=float,
-        default=1.0,
-        help="Speed multiplier"
-    )
 
     args = parser.parse_args()
 
@@ -92,19 +86,13 @@ Examples:
         print(f"Error: Scene file not found: {scene_path}")
         sys.exit(1)
 
-    if args.speed_scale <= 0:
-        print(
-            f"Error: --speed-scale must be positive (got {args.speed_scale})"
-        )
-        sys.exit(1)
-
     print("=" * 60)
     print("TDCR Path Executor")
     print("=" * 60)
 
     print(f"\nLoading trajectory from {trajectory_path}")
     try:
-        trajectory = load_trajectory(str(trajectory_path))
+        trajectory, dt = load_trajectory(str(trajectory_path))
         print(f"\tLoaded {len(trajectory)} waypoints")
     except Exception as e:
         print(f"Error loading trajectory: {e}")
@@ -113,8 +101,7 @@ Examples:
     print("\nLaunching MuJoCo visualization")
     sim_config = SimulationConfig(
         fps=args.fps,
-        loop=not args.no_loop,
-        speed_scale=args.speed_scale
+        loop=not args.no_loop
     )
 
     try:
@@ -142,12 +129,9 @@ Examples:
         return
 
     print("\nExecuting on robot")
-    exec_config = ExecutionConfig(
-        speed_scale=args.speed_scale
-    )
 
     try:
-        execute_trajectory(args.robot_ip, trajectory, exec_config)
+        execute_trajectory(args.robot_ip, trajectory, dt)
         print("\nExecution complete")
     except KeyboardInterrupt:
         print("\nExecution interrupted by user")

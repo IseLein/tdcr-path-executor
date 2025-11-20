@@ -17,7 +17,6 @@ class SimulationConfig:
     """Configuration for MuJoCo simulation playback."""
     fps: int = DEFAULT_MUJOCO_FPS
     loop: bool = True
-    speed_scale: float = 1.0
 
 
 def visualize_trajectory(
@@ -42,7 +41,6 @@ def visualize_trajectory(
     print("\nTrajectory info:")
     print(f"\t- Total waypoints: {len(trajectory)}")
     print(f"\t- Playback speed: {config.fps} waypoints/sec")
-    print(f"\t- Speed scale: {config.speed_scale}x")
     print(f"\t- Loop: {config.loop}")
     print("\nControls:")
     print("\t- Close window to quit")
@@ -84,7 +82,6 @@ def _control_loop(
         running: List with single boolean element for thread control
     """
     step_idx = 0
-    effective_fps = config.fps * config.speed_scale
 
     while running[0]:
         if step_idx >= len(trajectory):
@@ -110,4 +107,4 @@ def _control_loop(
             time.sleep(2.0)
 
         step_idx += 1
-        time.sleep(1.0 / effective_fps)
+        time.sleep(1.0 / config.fps)

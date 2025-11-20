@@ -4,19 +4,11 @@ import time
 import numpy as np
 from dataclasses import dataclass
 from typing import List, Dict
-from scipy.interpolate import CubicSpline
 
 import csc376_bind_franky
 
 from .trajectory_loader import TrajectoryData
-from .config import (DEFAULT_EXECUTION_SPEED, BASE_EXECUTION_DT,
-                     CONTINUITY_THRESHOLD)
-
-
-@dataclass
-class ExecutionConfig:
-    """Configuration for robot trajectory execution."""
-    speed_scale: float = DEFAULT_EXECUTION_SPEED
+from .config import CONTINUITY_THRESHOLD
 
 
 def connect_robot(robot_ip: str):
@@ -44,22 +36,19 @@ def connect_robot(robot_ip: str):
 def execute_trajectory(
     robot_ip: str,
     trajectory: List[TrajectoryData],
-    config: ExecutionConfig = None
+    dt: float
 ):
     """Execute trajectory on real Franka robot.
 
     Args:
         robot_ip: IP address of the Franka robot
         trajectory: List of trajectory waypoints
-        config: Execution configuration (uses defaults if None)
+        dt: Time step between waypoints in seconds
 
     Raises:
         RuntimeError: If execution fails
         ValueError: If trajectory validation fails
     """
-    if config is None:
-        config = ExecutionConfig()
-
     controller = connect_robot(robot_ip)
 
     # Check if we need to move to start position
@@ -74,16 +63,14 @@ def execute_trajectory(
 
     if position_error > 0.01:
         print("\nMoving to start position...")
-        _move_to_start(controller, current_pos, start_pos, config)
+        _move_to_start(controller, current_pos, start_pos, dt)
         print("✓ Reached start position")
 
     q_traj = np.array([wp.franka_qpos for wp in trajectory])
-    dt = BASE_EXECUTION_DT / config.speed_scale
 
     print("\nExecution info:")
     print(f"\t- Waypoints: {len(trajectory)}")
-    print(f"\t- Speed scale: {config.speed_scale}")
-    print(f"\t- Timestep: {dt:.3f} seconds")
+    print(f"\t- Timestep: {dt:.6f} seconds ({1.0/dt:.1f} Hz)")
     print(f"\t- Estimated duration: {len(trajectory) * dt:.1f} seconds")
 
     print("\nExecuting trajectory...")
@@ -94,20 +81,19 @@ def execute_trajectory(
         raise RuntimeError(f"Trajectory execution failed: {e}")
 
 
-def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, config: ExecutionConfig) -> None:
+def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, dt: float) -> None:
     """Move robot from current position to trajectory start position.
 
     Args:
         controller: FrankaJointTrajectoryController instance
         current_pos: Current joint positions (7-element array)
         start_pos: Target start joint positions (7-element array)
-        config: Execution configuration
+        dt: Time step between waypoints in seconds
     """
     delta = start_pos - current_pos
     max_delta = np.max(np.abs(delta))
 
     num_waypoints = int(np.ceil(max_delta / CONTINUITY_THRESHOLD))
-    dt = BASE_EXECUTION_DT / config.speed_scale
 
     move_traj = np.linspace(current_pos, start_pos, num_waypoints)
 
