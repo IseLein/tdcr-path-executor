@@ -1,0 +1,3 @@
+[submodule "lib/csc376"]
+	path = lib/csc376
+	url = https://github.com/radiang/csc376.git

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import List, Dict
 from scipy.interpolate import CubicSpline
 
-import csc376_franky
+import csc376_bind_franky
 
 from .trajectory_loader import TrajectoryData
 from .config import (DEFAULT_EXECUTION_SPEED, BASE_EXECUTION_DT,
@@ -33,7 +33,7 @@ def connect_robot(robot_ip: str):
     """
     print(f"Connecting to robot at {robot_ip}...")
     try:
-        controller = csc376_franky.FrankaJointTrajectoryController(robot_ip)
+        controller = csc376_bind_franky.FrankaJointTrajectoryController(robot_ip)
         controller.setupSignalHandler()
         print("Connected to robot")
         return controller
@@ -88,7 +88,7 @@ def execute_trajectory(
 
     print("\nExecuting trajectory...")
     try:
-        controller.run_trajectory(q_traj, dt)
+        controller.run_joint_trajectory(q_traj, dt)
         print("Trajectory executed successfully")
     except Exception as e:
         raise RuntimeError(f"Trajectory execution failed: {e}")
@@ -115,4 +115,4 @@ def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, c
     print(f"  - Move waypoints: {num_waypoints}")
     print(f"  - Estimated time: {num_waypoints * dt:.1f} seconds")
 
-    controller.run_trajectory(move_traj, dt)
+    controller.run_joint_trajectory(move_traj, dt)
