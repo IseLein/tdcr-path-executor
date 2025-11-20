@@ -24,6 +24,7 @@ conda activate tdcr-executor
 pip install -r requirements.txt
 
 # Install franky library
+git submodule update --init --recursive
 cd lib/csc376/csc376_franky
 pip install .
 cd ../../..

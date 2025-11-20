@@ -64,9 +64,11 @@ def load_trajectory(json_path: str) -> tuple[List[TrajectoryData], float]:
         raw_trajectory = data["raw_joint_trajectory"]
     elif "trajectory" in data:
         raw_trajectory = data["trajectory"]
+    elif "smooth_trajectory" in data:
+        raw_trajectory = data["smooth_trajectory"]
     else:
         raise ValueError(
-            "JSON must contain 'trajectory' or 'raw_joint_trajectory' key. "
+            "JSON must contain 'trajectory', 'raw_joint_trajectory' or 'smooth_joint_trajectory' key"
             f"Found keys: {list(data.keys())}"
         )
 
@@ -92,7 +94,7 @@ def load_trajectory(json_path: str) -> tuple[List[TrajectoryData], float]:
     dts = np.diff(times)
     dt = np.mean(dts)
 
-    # Verify dt is constant (within tolerance)
+    # Verify dt is within tolerance
     if np.std(dts) > 1e-6:
         raise ValueError(
             f"Time differences are not constant! "
