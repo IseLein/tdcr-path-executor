@@ -87,18 +87,18 @@ def load_trajectory(json_path: str) -> tuple[List[TrajectoryData], float]:
     # Calculate dt from time differences
     if len(trajectory) < 2:
         raise ValueError("Trajectory must have at least 2 waypoints to calculate dt")
-    
+
     times = np.array([wp.time for wp in trajectory])
     dts = np.diff(times)
     dt = np.mean(dts)
-    
+
     # Verify dt is constant (within tolerance)
     if np.std(dts) > 1e-6:
         raise ValueError(
             f"Time differences are not constant! "
             f"Mean dt: {dt:.6f}s, Std: {np.std(dts):.9f}s"
         )
-    
+
     print(f"✓ Trajectory dt: {dt:.6f}s ({1.0/dt:.1f} Hz)")
 
     validate_trajectory(trajectory)

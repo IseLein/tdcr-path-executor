@@ -1,9 +1,7 @@
 """Execute trajectories on real Franka robot using csc376_franky library."""
 
-import time
 import numpy as np
-from dataclasses import dataclass
-from typing import List, Dict
+from typing import List
 
 import csc376_bind_franky
 
