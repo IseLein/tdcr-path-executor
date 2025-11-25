@@ -9,45 +9,10 @@ from .trajectory_loader import TrajectoryData
 from .config import CONTINUITY_THRESHOLD
 
 
-def connect_robot(robot_ip: str):
-    """Initialize connection to Franka robot.
-
-    Args:
-        robot_ip: IP address of the Franka robot
-
-    Returns:
-        FrankaJointTrajectoryController instance
-
-    Raises:
-        RuntimeError: If connection fails
-    """
-    print(f"Connecting to robot at {robot_ip}...")
-    try:
-        controller = csc376_bind_franky.FrankaJointTrajectoryController(robot_ip)
-        controller.setupSignalHandler()
-        print("Connected to robot")
-        return controller
-    except Exception as e:
-        raise RuntimeError(f"Failed to connect to robot: {e}")
-
-
-def execute_trajectory(
-    robot_ip: str,
-    trajectory: List[TrajectoryData],
-    dt: float
-):
-    """Execute trajectory on real Franka robot.
-
-    Args:
-        robot_ip: IP address of the Franka robot
-        trajectory: List of trajectory waypoints
-        dt: Time step between waypoints in seconds
-
-    Raises:
-        RuntimeError: If execution fails
-        ValueError: If trajectory validation fails
-    """
-    controller = connect_robot(robot_ip)
+def execute_trajectory(robot_ip: str, trajectory: List[TrajectoryData], dt: float):
+    controller = csc376_bind_franky.FrankaJointTrajectoryController(robot_ip)
+    controller.setupSignalHandler()
+    print("Connected to robot")
 
     # Check if we need to move to start position
     current_pos = np.array(controller.get_current_joint_positions())
@@ -62,7 +27,7 @@ def execute_trajectory(
     if position_error > 0.01:
         print("\nMoving to start position...")
         _move_to_start(controller, current_pos, start_pos, dt)
-        print("✓ Reached start position")
+        print("Reached start position")
 
     q_traj = np.array([wp.franka_qpos for wp in trajectory])
 
@@ -72,11 +37,8 @@ def execute_trajectory(
     print(f"\t- Estimated duration: {len(trajectory) * dt:.1f} seconds")
 
     print("\nExecuting trajectory...")
-    try:
-        controller.run_joint_trajectory(q_traj, dt)
-        print("Trajectory executed successfully")
-    except Exception as e:
-        raise RuntimeError(f"Trajectory execution failed: {e}")
+    controller.run_joint_trajectory(q_traj, dt)
+    print("Trajectory executed successfully")
 
 
 def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, dt: float) -> None:

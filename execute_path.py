@@ -64,7 +64,7 @@ Examples:
     parser.add_argument(
         "--fps",
         type=int,
-        default=10,
+        default=100,
         help="Simulation playback speed (default=10)"
     )
     parser.add_argument(
