@@ -32,9 +32,9 @@ def execute_trajectory(robot_ip: str, trajectory: List[TrajectoryData], dt: floa
     q_traj = np.array([wp.franka_qpos for wp in trajectory])
 
     print("\nExecution info:")
-    print(f"\t- Waypoints: {len(trajectory)}")
-    print(f"\t- Timestep: {dt:.6f} seconds ({1.0/dt:.1f} Hz)")
-    print(f"\t- Estimated duration: {len(trajectory) * dt:.1f} seconds")
+    print(f"  - Waypoints: {len(trajectory)}")
+    print(f"  - Timestep: {dt:.6f} seconds ({1.0/dt:.1f} Hz)")
+    print(f"  - Estimated duration: {len(trajectory) * dt:.1f} seconds")
 
     print("\nExecuting trajectory...")
     controller.run_joint_trajectory(q_traj, dt)
@@ -42,22 +42,13 @@ def execute_trajectory(robot_ip: str, trajectory: List[TrajectoryData], dt: floa
 
 
 def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, dt: float) -> None:
-    """Move robot from current position to trajectory start position.
-
-    Args:
-        controller: FrankaJointTrajectoryController instance
-        current_pos: Current joint positions (7-element array)
-        start_pos: Target start joint positions (7-element array)
-        dt: Time step between waypoints in seconds
-    """
     delta = start_pos - current_pos
     max_delta = np.max(np.abs(delta))
 
-    num_waypoints = int(np.ceil(max_delta / CONTINUITY_THRESHOLD))
-
+    num_waypoints = int(np.ceil(max_delta / CONTINUITY_THRESHOLD)) * 10
     move_traj = np.linspace(current_pos, start_pos, num_waypoints)
 
-    print(f"  - Move distance: {max_delta:.4f} rad")
+    print(f"  - Max joint distance: {max_delta:.4f} rad")
     print(f"  - Move waypoints: {num_waypoints}")
     print(f"  - Estimated time: {num_waypoints * dt:.1f} seconds")
 

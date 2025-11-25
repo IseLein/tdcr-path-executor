@@ -91,12 +91,8 @@ Examples:
     print("=" * 60)
 
     print(f"\nLoading trajectory from {trajectory_path}")
-    try:
-        trajectory, dt = load_trajectory(str(trajectory_path))
-        print(f"\tLoaded {len(trajectory)} waypoints")
-    except Exception as e:
-        print(f"Error loading trajectory: {e}")
-        sys.exit(1)
+    trajectory, dt = load_trajectory(str(trajectory_path))
+    print(f"\tLoaded {len(trajectory)} waypoints")
 
     print("\nLaunching MuJoCo visualization")
     sim_config = SimulationConfig(
@@ -104,41 +100,26 @@ Examples:
         loop=not args.no_loop
     )
 
-    try:
-        visualize_trajectory(str(scene_path), trajectory, sim_config)
-    except KeyboardInterrupt:
-        print("\nVisualization interrupted by user")
-        sys.exit(0)
-    except Exception as e:
-        print(f"Error during visualization: {e}")
-        sys.exit(1)
+    visualize_trajectory(str(scene_path), trajectory, sim_config)
 
     print("\nSimulation complete")
-    print("\nExecution decision")
 
     if args.simulate_only:
-        print("\t--simulate-only flag set, skipping execution")
+        print("--simulate-only flag set, skipping execution")
         return
 
     if args.robot_ip is None:
-        print("\tNo --robot-ip provided, skipping execution")
+        print("No --robot-ip provided, skipping execution")
         return
 
     if not confirm_execution():
-        print("\tUser declined execution")
+        print("User declined execution")
         return
 
     print("\nExecuting on robot")
 
-    try:
-        execute_trajectory(args.robot_ip, trajectory, dt)
-        print("\nExecution complete")
-    except KeyboardInterrupt:
-        print("\nExecution interrupted by user")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error during execution: {e}")
-        sys.exit(1)
+    execute_trajectory(args.robot_ip, trajectory, dt)
+    print("\nExecution complete")
 
 
 if __name__ == "__main__":
