@@ -3,14 +3,22 @@
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import numpy as np
+import toppra as ta
+import toppra.constraint as constraint
+import toppra.algorithm as algo
 
 from .config import (
     FRANKA_JOINT_LIMITS,
     TDCR_TENDON_COUNT,
-    CONTINUITY_THRESHOLD
+    CONTINUITY_THRESHOLD,
+    DEFAULT_FRANKA_VEL_LIMITS,
+    DEFAULT_FRANKA_ACC_LIMITS,
+    DEFAULT_TENDON_VEL_LIMITS,
+    DEFAULT_TENDON_ACC_LIMITS,
+    DEFAULT_CONTROL_FREQ
 )
 
 
@@ -30,29 +38,72 @@ class TrajectoryData:
         )
 
 
+def _smooth_raw_trajectory(
+    raw_waypoints: list,
+    control_freq: float = DEFAULT_CONTROL_FREQ,
+    franka_vel_limits: np.ndarray = DEFAULT_FRANKA_VEL_LIMITS,
+    franka_acc_limits: np.ndarray = DEFAULT_FRANKA_ACC_LIMITS,
+    tendon_vel_limits: np.ndarray = DEFAULT_TENDON_VEL_LIMITS,
+    tendon_acc_limits: np.ndarray = DEFAULT_TENDON_ACC_LIMITS,
+    verbose: bool = True
+) -> tuple[List[TrajectoryData], float]:
+    franka_positions = np.array([wp['franka_qpos'] for wp in raw_waypoints])
+    tendon_positions = np.array([wp['tendon_lengths'] for wp in raw_waypoints])
+
+    joint_positions = np.hstack([franka_positions, tendon_positions])
+    n_joints = joint_positions.shape[1]
+
+    print(f"Smoothing {len(raw_waypoints)} waypoints with {n_joints} DOF...")
+
+    gridpoints = np.linspace(0, 1, len(joint_positions))
+    path = ta.SplineInterpolator(gridpoints, joint_positions)
+
+    vlim = np.hstack([franka_vel_limits, tendon_vel_limits])
+    alim = np.hstack([franka_acc_limits, tendon_acc_limits])
+
+    pc_vel = constraint.JointVelocityConstraint(vlim)
+    pc_acc = constraint.JointAccelerationConstraint(alim)
+
+    instance = algo.TOPPRA(
+        [pc_vel, pc_acc],
+        path,
+        parametrizer="ParametrizeConstAccel"
+    )
+
+    jnt_traj = instance.compute_trajectory(0, 0)
+
+    if jnt_traj is None:
+        raise RuntimeError(
+            "TOPPRA failed to compute trajectory. "
+            "Try relaxing velocity/acceleration limits."
+        )
+
+    duration = jnt_traj.duration
+    dt = 1.0 / control_freq
+
+    n_samples = int(np.round(duration / dt)) + 1
+    ts_sample = np.linspace(0, duration, n_samples)
+
+    print(f"TOPPRA duration: {duration:.3f}s, {n_samples} samples at {control_freq} Hz")
+
+    qs_sample = jnt_traj(ts_sample)
+
+    trajectory = []
+    for i, t in enumerate(ts_sample):
+        franka_qpos = qs_sample[i, :7]
+        tendon_lengths = qs_sample[i, 7:]
+
+        trajectory.append(TrajectoryData(
+            franka_qpos=franka_qpos,
+            tdcr_tendon_lengths=tendon_lengths,
+            step=i,
+            time=float(t)
+        ))
+
+    return trajectory
+
+
 def load_trajectory(json_path: str) -> tuple[List[TrajectoryData], float]:
-    """Load trajectory from JSON file.
-
-    Supports multiple JSON formats:
-    - {"trajectory": [...]}
-    - {"raw_joint_trajectory": [...]}
-
-    Each waypoint should contain:
-    - "franka_qpos": list of 7 joint angles (required)
-    - "tendon_lengths": list of 9 values
-    - "step": integer step index (optional)
-    - "time": float timestamp in seconds (required)
-
-    Args:
-        json_path: Path to JSON trajectory file
-
-    Returns:
-        Tuple of (trajectory waypoints, dt between steps in seconds)
-
-    Raises:
-        FileNotFoundError: If file doesn't exist
-        ValueError: If JSON format is invalid or dt is not constant
-    """
     json_path = Path(json_path)
     if not json_path.exists():
         raise FileNotFoundError(f"Trajectory file not found: {json_path}")
@@ -68,25 +119,33 @@ def load_trajectory(json_path: str) -> tuple[List[TrajectoryData], float]:
         raw_trajectory = data["smooth_trajectory"]
     else:
         raise ValueError(
-            "JSON must contain 'trajectory', 'raw_joint_trajectory' or 'smooth_joint_trajectory' key"
+            "JSON must contain 'trajectory', 'raw_joint_trajectory' or 'smooth_trajectory' key. "
             f"Found keys: {list(data.keys())}"
         )
 
-    trajectory = []
-    for i, waypoint in enumerate(raw_trajectory):
-        franka_qpos = waypoint["franka_qpos"]
-        tdcr_tendon_lengths = waypoint["tendon_lengths"]
-        step = waypoint["step"]
-        time = waypoint["time"]
+    if len(raw_trajectory) == 0:
+        raise ValueError("Trajectory is empty")
 
-        trajectory.append(TrajectoryData(
-            franka_qpos=franka_qpos,
-            tdcr_tendon_lengths=tdcr_tendon_lengths,
-            step=step,
-            time=time
-        ))
+    is_raw = 'time' not in raw_trajectory[0]
 
-    # Calculate dt from time differences
+    if is_raw:
+        print(f"Detected raw trajectory, applying TOPPRA smoothing...")
+        trajectory = _smooth_raw_trajectory(raw_waypoints=raw_trajectory)
+    else:
+        trajectory = []
+        for i, waypoint in enumerate(raw_trajectory):
+            franka_qpos = waypoint["franka_qpos"]
+            tdcr_tendon_lengths = waypoint["tendon_lengths"]
+            step = waypoint.get("step", i)
+            time = waypoint["time"]
+
+            trajectory.append(TrajectoryData(
+                franka_qpos=franka_qpos,
+                tdcr_tendon_lengths=tdcr_tendon_lengths,
+                step=step,
+                time=time
+            ))
+
     if len(trajectory) < 2:
         raise ValueError("Trajectory must have at least 2 waypoints to calculate dt")
 
@@ -94,14 +153,13 @@ def load_trajectory(json_path: str) -> tuple[List[TrajectoryData], float]:
     dts = np.diff(times)
     dt = np.mean(dts)
 
-    # Verify dt is within tolerance
     if np.std(dts) > 1e-6:
         raise ValueError(
             f"Time differences are not constant! "
             f"Mean dt: {dt:.6f}s, Std: {np.std(dts):.9f}s"
         )
 
-    print(f"✓ Trajectory dt: {dt:.6f}s ({1.0/dt:.1f} Hz)")
+    print(f"Trajectory dt: {dt:.6f}s ({1.0/dt:.1f} Hz)")
 
     validate_trajectory(trajectory)
     return trajectory, dt
@@ -112,15 +170,9 @@ def validate_trajectory(trajectory: List[TrajectoryData]) -> None:
 
     Checks:
     - Franka joint positions are 7 elements
-    - Joint angles are within limits
     - TDCR tendon lengths are 9 elements
+    - Joint angles are within limits
     - Waypoint transitions are continuous
-
-    Args:
-        trajectory: List of trajectory waypoints
-
-    Raises:
-        ValueError: If validation fails
     """
     if len(trajectory) == 0:
         raise ValueError("Trajectory is empty")
