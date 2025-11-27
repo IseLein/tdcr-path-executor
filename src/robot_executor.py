@@ -21,7 +21,7 @@ def execute_trajectory(
     robot_ip: str,
     trajectory: List[TrajectoryData],
     dt: float,
-    tdcr_device: Optional[str] = None
+    tdcr_device: str
 ):
     controller = csc376_bind_franky.FrankaJointTrajectoryController(robot_ip)
     controller.setupSignalHandler()
