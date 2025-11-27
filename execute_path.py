@@ -10,7 +10,7 @@ from pathlib import Path
 from src.trajectory_loader import load_trajectory
 from src.mujoco_sim import visualize_trajectory, SimulationConfig
 from src.robot_executor import execute_trajectory
-from src.config import DEFAULT_SCENE_PATH
+from src.config import DEFAULT_SCENE_PATH, DEFAULT_SERIAL_PORT
 
 
 def confirm_execution() -> bool:
@@ -72,6 +72,12 @@ Examples:
         action="store_true",
         help="Don't loop trajectory in simulation"
     )
+    parser.add_argument(
+        "--tdcr-device",
+        type=str,
+        default=DEFAULT_SERIAL_PORT,
+        help=f"Serial port for TDCR (e.g., {DEFAULT_SERIAL_PORT})"
+    )
 
     args = parser.parse_args()
 
@@ -118,7 +124,7 @@ Examples:
 
     print("\nExecuting on robot")
 
-    execute_trajectory(args.robot_ip, trajectory, dt)
+    execute_trajectory(args.robot_ip, trajectory, dt, tdcr_device=args.tdcr_device)
     print("\nExecution complete")
 
 

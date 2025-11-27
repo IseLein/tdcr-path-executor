@@ -21,9 +21,16 @@ TDCR_TENDON_COUNT = 9
 DEFAULT_MUJOCO_FPS = 10
 CONTINUITY_THRESHOLD = 0.015  # (franky limit: 0.0174 rad)
 
+# TDCR Dynamixel servo configuration
+DEFAULT_SERIAL_PORT = "/dev/ttyUSB0"
+TDCR_SERVO_IDS = np.array([3, 1, 10, 7, 5, 6, 11, 9, 2])
+TDCR_SPOOL_RADII_MM = np.ones(9) * 10.0
+TDCR_SERVO_DIRECTIONS = np.array([-1, -1, 1, -1, -1, 1, -1, -1, 1])
+TDCR_DEFAULT_SPEED_MM_PER_SEC = 8.0
+
 # Default velocity/acceleration limits for TOPPRA smoothing
 DEFAULT_FRANKA_VEL_LIMITS = np.array([1.0] * 7)
 DEFAULT_FRANKA_ACC_LIMITS = np.array([0.5] * 7)
 DEFAULT_TENDON_VEL_LIMITS = np.array([0.05] * TDCR_TENDON_COUNT)
 DEFAULT_TENDON_ACC_LIMITS = np.array([0.5] * TDCR_TENDON_COUNT)
-DEFAULT_CONTROL_FREQ = 100
+DEFAULT_CONTROL_FREQ = 90
