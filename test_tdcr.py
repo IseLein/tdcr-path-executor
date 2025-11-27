@@ -29,8 +29,11 @@ def main():
     print(f"Loading trajectory from {args.trajectory}")
     trajectory, _ = load_trajectory(args.trajectory)
 
-    # Extract TDCR tendon lengths
-    tendon_trajectory = np.array([wp.tdcr_tendon_lengths for wp in trajectory])
+    # Extract TDCR tendon lengths and convert from absolute (m) to relative (mm)
+    initial_lengths_m = trajectory[0].tdcr_tendon_lengths
+    tendon_trajectory = np.array([
+        (wp.tdcr_tendon_lengths - initial_lengths_m) * 1000.0 for wp in trajectory
+    ])
     print(f"Loaded {len(tendon_trajectory)} waypoints")
     print(f"Tendon range: {tendon_trajectory.min():.2f} to {tendon_trajectory.max():.2f} mm")
 

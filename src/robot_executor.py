@@ -2,7 +2,7 @@
 
 import time
 import numpy as np
-from typing import List, Optional
+from typing import List
 
 import csc376_bind_franky
 from lib.dynamixel.multi_tendon_sync_rw import MultiTendonSyncRW
@@ -53,7 +53,7 @@ def execute_trajectory(
         _move_to_start(controller, current_pos, start_pos, dt)
         print("Franka reached start position")
 
-    _move_tdcr_to_start(tdcr_controller, trajectory[0].tdcr_tendon_lengths)
+    initial_tdcr_lengths_m = trajectory[0].tdcr_tendon_lengths
 
     q_traj = np.array([wp.franka_qpos for wp in trajectory])
 
@@ -64,12 +64,18 @@ def execute_trajectory(
     print(f"  - TDCR: {'enabled' if tdcr_controller else 'disabled'}")
 
     def trajectory_callback(index):
-        tdcr_controller.async_set_tendons_mm(trajectory[index].tdcr_tendon_lengths)
+        relative_lengths_mm = _transform_tendon_lengths(
+            trajectory[index].tdcr_tendon_lengths,
+            initial_tdcr_lengths_m
+        )
+        tdcr_controller.async_set_tendons_mm(relative_lengths_mm)
     controller.set_trajectory_callback(trajectory_callback)
 
     print("\nExecuting trajectory...")
     controller.run_joint_trajectory(q_traj, dt)
     print("Trajectory executed successfully")
+
+    _move_tdcr_to_zero(tdcr_controller)
 
 
 def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, dt: float) -> None:
@@ -85,19 +91,19 @@ def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, d
 
     controller.run_joint_trajectory(move_traj, dt)
 
+def _transform_tendon_lengths(absolute_lengths_m: np.ndarray, initial_lengths_m: np.ndarray) -> np.ndarray:
+    """Transform absolute tendon lengths (meters) to relative lengths (mm)."""
+    return (absolute_lengths_m - initial_lengths_m) * 1000.0
 
-def _move_tdcr_to_start(tdcr_controller, start_lengths: np.ndarray) -> None:
+
+def _move_tdcr_to_zero(tdcr_controller, wait_before: float = 10.0) -> None:
+    """Move TDCR back to zero position after waiting."""
+    print(f"\nWaiting {wait_before:.1f}s before returning TDCR to zero...")
+    time.sleep(wait_before)
+    print("Moving TDCR to zero position...")
     current_lengths = tdcr_controller.get_tendons_mm()
-    max_delta = np.max(np.abs(start_lengths - current_lengths))
-
-    print("\nTDCR start position check:")
-    print(f"  Current lengths: {np.array2string(current_lengths, precision=2)} mm")
-    print(f"  Trajectory start: {np.array2string(start_lengths, precision=2)} mm")
-    print(f"  Max delta: {max_delta:.2f} mm")
-
-    if max_delta > 0.5:
-        print("Moving TDCR to start position...")
-        tdcr_controller.async_set_tendons_mm_together(start_lengths)
-        wait_time = max_delta / TDCR_DEFAULT_SPEED_MM_PER_SEC + 0.5
-        time.sleep(wait_time)
-        print("TDCR reached start position")
+    max_delta = np.max(np.abs(current_lengths))
+    tdcr_controller.async_set_tendons_mm(np.zeros(9))
+    wait_time = max_delta / TDCR_DEFAULT_SPEED_MM_PER_SEC + 0.5
+    time.sleep(wait_time)
+    print("TDCR returned to zero position")
