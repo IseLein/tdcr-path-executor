@@ -4,7 +4,8 @@ import os
 import numpy as np
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DEFAULT_SCENE_PATH = os.path.join(_PROJECT_ROOT, "data", "ftl_ftdcr_v2_franka_scene.xml")
+# DEFAULT_SCENE_PATH = os.path.join(_PROJECT_ROOT, "data", "ftl_ftdcr_v2_franka_scene.xml")
+DEFAULT_SCENE_PATH = os.path.join(_PROJECT_ROOT, "data", "ftdcr_v4_sysid_franka_scene.xml")
 
 # Franka Emika Panda joint limits (radians)
 FRANKA_JOINT_LIMITS = np.array([
