@@ -14,6 +14,7 @@ from .config import (
     TDCR_SPOOL_RADII_MM,
     TDCR_SERVO_DIRECTIONS,
     TDCR_DEFAULT_SPEED_MM_PER_SEC,
+    SIM_TO_REAL_RATIO,
 )
 
 
@@ -92,12 +93,10 @@ def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, d
     controller.run_joint_trajectory(move_traj, dt)
 
 def _transform_tendon_lengths(absolute_lengths_m: np.ndarray, initial_lengths_m: np.ndarray) -> np.ndarray:
-    """Transform absolute tendon lengths (meters) to relative lengths (mm)."""
-    return (absolute_lengths_m - initial_lengths_m) * 1000.0
+    return (absolute_lengths_m - initial_lengths_m) * 1000.0 * SIM_TO_REAL_RATIO
 
 
 def _move_tdcr_to_zero(tdcr_controller, wait_before: float = 10.0) -> None:
-    """Move TDCR back to zero position after waiting."""
     print(f"\nWaiting {wait_before:.1f}s before returning TDCR to zero...")
     time.sleep(wait_before)
     print("Moving TDCR to zero position...")

@@ -106,5 +106,9 @@ def _control_loop(
             print("Waiting for system to get to start position")
             time.sleep(2.0)
 
+        if step_idx == len(trajectory) - 1:
+            print("Waiting at end position")
+            time.sleep(2.0)
+
         step_idx += 1
         time.sleep(1.0 / config.fps)

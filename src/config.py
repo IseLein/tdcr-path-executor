@@ -25,8 +25,9 @@ CONTINUITY_THRESHOLD = 0.015  # (franky limit: 0.0174 rad)
 DEFAULT_SERIAL_PORT = "/dev/ttyUSB0"
 TDCR_SERVO_IDS = np.array([3, 1, 10, 7, 5, 6, 11, 9, 2])
 TDCR_SPOOL_RADII_MM = np.ones(9) * 10.0
-TDCR_SERVO_DIRECTIONS = np.array([-1, -1, 1, -1, -1, 1, -1, -1, 1])
+TDCR_SERVO_DIRECTIONS = np.array([1, 1, -1, 1, 1, -1, 1, 1, -1])
 TDCR_DEFAULT_SPEED_MM_PER_SEC = 8.0
+SIM_TO_REAL_RATIO = 2.5
 
 # Default velocity/acceleration limits for TOPPRA smoothing
 DEFAULT_FRANKA_VEL_LIMITS = np.array([1.0] * 7)
