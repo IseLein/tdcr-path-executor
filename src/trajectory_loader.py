@@ -106,7 +106,7 @@ def _smooth_raw_trajectory(
 def load_trajectory_no_toppra(
     json_path: str,
     dt: float = 0.02,
-    franka_vel_limits: np.ndarray = DEFAULT_FRANKA_VEL_LIMITS,
+    franka_vel_limits: np.ndarray = DEFAULT_FRANKA_VEL_LIMITS / 10,
     tendon_vel_limits: np.ndarray = DEFAULT_TENDON_VEL_LIMITS,
 ) -> tuple[List[TrajectoryData], float]:
     json_path = Path(json_path)
