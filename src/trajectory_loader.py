@@ -103,6 +103,84 @@ def _smooth_raw_trajectory(
     return trajectory
 
 
+def load_trajectory_no_toppra(
+    json_path: str,
+    dt: float = 0.02,
+    franka_vel_limits: np.ndarray = DEFAULT_FRANKA_VEL_LIMITS,
+    tendon_vel_limits: np.ndarray = DEFAULT_TENDON_VEL_LIMITS,
+) -> tuple[List[TrajectoryData], float]:
+    json_path = Path(json_path)
+    if not json_path.exists():
+        raise FileNotFoundError(f"Trajectory file not found: {json_path}")
+
+    with open(json_path, 'r') as f:
+        data = json.load(f)
+
+    if "raw_joint_trajectory" in data:
+        raw_trajectory = data["raw_joint_trajectory"]
+    elif "trajectory" in data:
+        raw_trajectory = data["trajectory"]
+    else:
+        raise ValueError(
+            "JSON must contain 'trajectory' or 'raw_joint_trajectory' key. "
+            f"Found keys: {list(data.keys())}"
+        )
+
+    if len(raw_trajectory) == 0:
+        raise ValueError("Trajectory is empty")
+
+    if len(raw_trajectory) < 2:
+        raise ValueError("Trajectory must have at least 2 waypoints")
+
+    max_franka_delta = franka_vel_limits * dt
+    max_tendon_delta = tendon_vel_limits * dt
+    max_deltas = np.hstack([max_franka_delta, max_tendon_delta])
+
+    trajectory = []
+    step_idx = 0
+
+    for i in range(len(raw_trajectory) - 1):
+        wp_a = raw_trajectory[i]
+        wp_b = raw_trajectory[i + 1]
+
+        pos_a = np.hstack([wp_a['franka_qpos'], wp_a['tendon_lengths']])
+        pos_b = np.hstack([wp_b['franka_qpos'], wp_b['tendon_lengths']])
+
+        deltas = np.abs(pos_b - pos_a)
+
+        with np.errstate(divide='ignore', invalid='ignore'):
+            steps_per_dof = np.ceil(deltas / max_deltas)
+            steps_per_dof = np.nan_to_num(steps_per_dof, nan=1.0, posinf=1.0)
+
+        n_steps = max(1, int(np.max(steps_per_dof)))
+
+        for j in range(n_steps):
+            alpha = j / n_steps
+            pos = pos_a + alpha * (pos_b - pos_a)
+
+            trajectory.append(TrajectoryData(
+                franka_qpos=pos[:7],
+                tdcr_tendon_lengths=pos[7:],
+                step=step_idx,
+                time=step_idx * dt
+            ))
+            step_idx += 1
+
+    final_wp = raw_trajectory[-1]
+    trajectory.append(TrajectoryData(
+        franka_qpos=np.array(final_wp['franka_qpos']),
+        tdcr_tendon_lengths=np.array(final_wp['tendon_lengths']),
+        step=step_idx,
+        time=step_idx * dt
+    ))
+
+    print(f"Generated {len(trajectory)} waypoints from {len(raw_trajectory)} raw waypoints")
+    print(f"Total duration: {trajectory[-1].time:.3f}s")
+
+    validate_trajectory(trajectory)
+    return trajectory, dt
+
+
 def load_trajectory(json_path: str) -> tuple[List[TrajectoryData], float]:
     json_path = Path(json_path)
     if not json_path.exists():

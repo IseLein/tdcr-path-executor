@@ -7,7 +7,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from src.trajectory_loader import load_trajectory
+from src.trajectory_loader import load_trajectory, load_trajectory_no_toppra
 from src.mujoco_sim import visualize_trajectory, SimulationConfig
 from src.robot_executor import execute_trajectory
 from src.config import DEFAULT_SCENE_PATH, DEFAULT_SERIAL_PORT
@@ -78,6 +78,11 @@ Examples:
         default=DEFAULT_SERIAL_PORT,
         help=f"Serial port for TDCR (e.g., {DEFAULT_SERIAL_PORT})"
     )
+    parser.add_argument(
+        "--no-toppra",
+        action="store_true",
+        help="Use linear interpolation instead of TOPPRA smoothing"
+    )
 
     args = parser.parse_args()
 
@@ -97,7 +102,11 @@ Examples:
     print("=" * 60)
 
     print(f"\nLoading trajectory from {trajectory_path}")
-    trajectory, dt = load_trajectory(str(trajectory_path))
+    if args.no_toppra:
+        print("Using linear interpolation (no TOPPRA)")
+        trajectory, dt = load_trajectory_no_toppra(str(trajectory_path))
+    else:
+        trajectory, dt = load_trajectory(str(trajectory_path))
     print(f"\tLoaded {len(trajectory)} waypoints")
 
     print("\nLaunching MuJoCo visualization")
