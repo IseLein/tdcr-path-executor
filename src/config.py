@@ -4,7 +4,6 @@ import os
 import numpy as np
 
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# DEFAULT_SCENE_PATH = os.path.join(_PROJECT_ROOT, "data", "ftl_ftdcr_v2_franka_scene.xml")
 DEFAULT_SCENE_PATH = os.path.join(_PROJECT_ROOT, "data", "ftdcr_v4_sysid_franka_scene.xml")
 
 # Franka Emika Panda joint limits (radians)
@@ -24,15 +23,15 @@ CONTINUITY_THRESHOLD = 0.015  # (franky limit: 0.0174 rad)
 
 # TDCR Dynamixel servo configuration
 DEFAULT_SERIAL_PORT = "/dev/ttyUSB0"
-TDCR_SERVO_IDS = np.array([3, 1, 10, 7, 5, 6, 11, 9, 2])
+TDCR_SERVO_IDS = np.array([3,9,4,2,8,5,1,7,6])
 TDCR_SPOOL_RADII_MM = np.ones(9) * 10.0
-TDCR_SERVO_DIRECTIONS = np.array([1, 1, -1, 1, 1, -1, 1, 1, -1])
+TDCR_SERVO_DIRECTIONS = np.array([1, 1,-1, 1, 1,-1, 1, 1, -1])
 TDCR_DEFAULT_SPEED_MM_PER_SEC = 8.0
-SIM_TO_REAL_RATIO = 2.5
+SIM_TO_REAL_RATIO = 1
 
 # Default velocity/acceleration limits for TOPPRA smoothing
 DEFAULT_FRANKA_VEL_LIMITS = np.array([1.0] * 7)
-DEFAULT_FRANKA_ACC_LIMITS = np.array([0.5] * 7)
+DEFAULT_FRANKA_ACC_LIMITS = np.array([0.4] * 7)
 DEFAULT_TENDON_VEL_LIMITS = np.array([0.05] * TDCR_TENDON_COUNT)
 DEFAULT_TENDON_ACC_LIMITS = np.array([0.5] * TDCR_TENDON_COUNT)
 DEFAULT_CONTROL_FREQ = 90

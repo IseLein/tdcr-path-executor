@@ -50,19 +50,20 @@ python execute_path.py trajectory.json --robot-ip 192.168.1.107
 ```
 
 ### Example
-
+Turn on Franka Robot with FCI.
 ```bash
-python execute_path.py raw_motion_plan.json --simulate-only
+conda activate tdcr-executor
+python execute_path.py data/raw_traj3.json --robot-ip 192.168.1.105 [--no-toppra]
 ```
+If segfault, double check tracjectory and FCI, reset enable switch
 
 ## Command-line Options
 
-- `--scene PATH` - MuJoCo scene file (default: data/ftl_ftdcr_v2_franka_scene.xml)
+- `--scene PATH` - MuJoCo scene file (default: data/ftdcr_v4_sysid_franka_scene.xml)
 - `--simulate-only` - Run visualization without executing on robot
 - `--robot-ip IP` - IP address of Franka robot (required for execution)
 - `--fps N` - Simulation playback speed (default: 10)
 - `--no-loop` - Don't loop trajectory in simulation
-- `--execution-speed N` - Robot execution speed multiplier (default: 1.0, slower: 0.5, faster: 2.0)
 
 ## Project Structure
 

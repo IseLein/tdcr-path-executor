@@ -28,7 +28,7 @@ class TrajectoryData:
     franka_qpos: np.ndarray
     tdcr_tendon_lengths: np.ndarray
     step: int
-    time: float
+    time: float    # absolute time from start
 
     def __post_init__(self):
         self.franka_qpos = np.asarray(self.franka_qpos, dtype=np.float64)
@@ -45,7 +45,6 @@ def _smooth_raw_trajectory(
     franka_acc_limits: np.ndarray = DEFAULT_FRANKA_ACC_LIMITS,
     tendon_vel_limits: np.ndarray = DEFAULT_TENDON_VEL_LIMITS,
     tendon_acc_limits: np.ndarray = DEFAULT_TENDON_ACC_LIMITS,
-    verbose: bool = True
 ) -> tuple[List[TrajectoryData], float]:
     franka_positions = np.array([wp['franka_qpos'] for wp in raw_waypoints])
     tendon_positions = np.array([wp['tendon_lengths'] for wp in raw_waypoints])
@@ -106,7 +105,7 @@ def _smooth_raw_trajectory(
 def load_trajectory_no_toppra(
     json_path: str,
     dt: float = 0.02,
-    franka_vel_limits: np.ndarray = DEFAULT_FRANKA_VEL_LIMITS / 10,
+    franka_vel_limits: np.ndarray = DEFAULT_FRANKA_VEL_LIMITS /  6,
     tendon_vel_limits: np.ndarray = DEFAULT_TENDON_VEL_LIMITS,
 ) -> tuple[List[TrajectoryData], float]:
     json_path = Path(json_path)

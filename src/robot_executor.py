@@ -32,12 +32,16 @@ def execute_trajectory(
         servo_ids=TDCR_SERVO_IDS,
         spool_radii_mm=TDCR_SPOOL_RADII_MM,
         device_name=tdcr_device,
-        servo_dir=TDCR_SERVO_DIRECTIONS
+        servo_dir=TDCR_SERVO_DIRECTIONS,
+        zero_offsets_tick=[1341, 2193, -2598, 3779, 338, -3448, 501, 2881, -1420] # from tension calibration
     )
-    tdcr_controller.set_zero_offsets_to_current_position()
     tdcr_controller.set_tendons_speeds_mm_per_sec(
         np.ones(9) * TDCR_DEFAULT_SPEED_MM_PER_SEC
     )
+
+    tdcr_controller.async_set_tendons_home()
+    time.sleep(5)
+    print("TDCR start position check:", tdcr_controller.get_tendons_tick())
     print("TDCR initialized")
 
     current_pos = np.array(controller.get_current_joint_positions())
@@ -54,7 +58,7 @@ def execute_trajectory(
         _move_to_start(controller, current_pos, start_pos, dt)
         print("Franka reached start position")
 
-    initial_tdcr_lengths_m = trajectory[0].tdcr_tendon_lengths
+    time.sleep(2)
 
     q_traj = np.array([wp.franka_qpos for wp in trajectory])
 
@@ -66,8 +70,7 @@ def execute_trajectory(
 
     def trajectory_callback(index):
         relative_lengths_mm = _transform_tendon_lengths(
-            trajectory[index].tdcr_tendon_lengths,
-            initial_tdcr_lengths_m
+            trajectory[index].tdcr_tendon_lengths
         )
         tdcr_controller.async_set_tendons_mm(relative_lengths_mm)
     controller.set_trajectory_callback(trajectory_callback)
@@ -92,8 +95,16 @@ def _move_to_start(controller, current_pos: np.ndarray, start_pos: np.ndarray, d
 
     controller.run_joint_trajectory(move_traj, dt)
 
-def _transform_tendon_lengths(absolute_lengths_m: np.ndarray, initial_lengths_m: np.ndarray) -> np.ndarray:
-    return (absolute_lengths_m - initial_lengths_m) * 1000.0 * SIM_TO_REAL_RATIO
+def _transform_tendon_lengths(absolute_lengths_m: np.ndarray) -> np.ndarray:
+    return (absolute_lengths_m - np.array([0.06375827694820722,
+                                        0.06375827694820722,
+                                        0.06375827694820722,
+                                        0.12788023446196162,
+                                        0.12788023446196162,
+                                        0.12788023446196162,
+                                        0.191885262696722,
+                                        0.191885262696722,
+                                        0.191885262696722])) * 1000.0 * SIM_TO_REAL_RATIO
 
 
 def _move_tdcr_to_zero(tdcr_controller, wait_before: float = 10.0) -> None:
